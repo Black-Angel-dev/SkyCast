@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SkyCast – Smart Weather</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230284c7'/><text y='72' x='50' text-anchor='middle' font-size='62' font-family='serif' font-weight='900' fill='white'>☀</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+<style>
+/* ===================== RESET & BASE ===================== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sky:#38bdf8;
+  --sky-light:#e0f5ff;
+  --sky-mid:#7dd3fc;
+  --orange:#fb923c;
+  --orange-light:#fff3e8;
+  --orange-mid:#fdba74;
+  --sand:#fef3c7;
+  --mint:#d1fae5;
+  --lavender:#ede9fe;
+  --rose:#ffe4e6;
+  --white:#ffffff;
+  --off-white:#f8fafc;
+  --cream:#fdfaf6;
+  --text-dark:#1e293b;
+  --text-mid:#475569;
+  --text-light:#94a3b8;
+  --card-border:#e2e8f0;
+  --card-shadow:0 4px 24px rgba(0,0,0,0.07);
+  --card-shadow-hover:0 12px 40px rgba(0,0,0,0.13);
+  --radius:20px;
+  --radius-sm:12px;
+  --transition:0.32s cubic-bezier(.4,0,.2,1);
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Nunito',sans-serif;
+  background:var(--off-white);
+  color:var(--text-dark);
+  overflow-x:hidden;
+}
+h1,h2,h3{font-family:'Playfair Display',serif}
+a{text-decoration:none;color:inherit}
+img{max-width:100%}
+
+/* ===================== NAV ===================== */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:1000;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1rem 5%;
+  background:rgba(255,255,255,0.88);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid rgba(226,232,240,0.8);
+  transition:background var(--transition);
+}
+.nav-logo{
+  font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;
+  color:var(--text-dark);letter-spacing:-0.5px;display:flex;align-items:center;gap:.4rem;
+}
+.nav-logo .dot{color:var(--sky)}
+.nav-links{display:flex;gap:2rem;list-style:none}
+.nav-links a{font-size:.88rem;font-weight:600;color:var(--text-mid);transition:color var(--transition)}
+.nav-links a:hover{color:var(--sky)}
+.nav-cta{
+  background:var(--text-dark);color:#fff;
+  padding:.5rem 1.4rem;border-radius:50px;
+  font-size:.85rem;font-weight:700;letter-spacing:.02em;
+  transition:transform var(--transition),box-shadow var(--transition);
+}
+.nav-cta:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(30,41,59,.25)}
+.hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:4px}
+.hamburger span{width:22px;height:2px;background:var(--text-dark);border-radius:2px;transition:var(--transition)}
+.mobile-menu{
+  display:none;position:fixed;top:68px;left:0;right:0;z-index:999;
+  background:rgba(255,255,255,0.97);backdrop-filter:blur(20px);
+  padding:1.5rem 5% 2rem;flex-direction:column;gap:1.2rem;
+  border-bottom:1px solid var(--card-border);
+}
+.mobile-menu.open{display:flex}
+.mobile-menu a{font-size:1rem;font-weight:600;color:var(--text-mid)}
+.mobile-menu a:hover{color:var(--sky)}
+
+/* ===================== HERO WITH PHOTO BACKGROUND ===================== */
+#hero{
+  min-height:100vh;position:relative;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:7rem 5% 4rem;
+}
+/* The actual background photo layer */
+#heroBg{
+  position:absolute;inset:0;z-index:0;
+  background-size:cover;background-position:center center;background-repeat:no-repeat;
+  transition:background-image 1.2s ease, opacity 1s ease;
+}
+/* Dark overlay so text is always readable */
+#heroBg::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,0.38) 0%,rgba(0,0,0,0.18) 50%,rgba(0,0,0,0.5) 100%);
+}
+/* Rainy overlay — animated rain on top of photo */
+.rain-wrap{position:absolute;inset:0;overflow:hidden;z-index:1;pointer-events:none}
+.raindrop{position:absolute;width:2px;border-radius:2px;background:rgba(180,210,255,.55);animation:fall linear infinite}
+@keyframes fall{from{transform:translateY(-100px) rotate(12deg);opacity:0}10%{opacity:1}to{transform:translateY(110vh) rotate(12deg);opacity:.3}}
+/* Snow overlay */
+.snowflake{position:absolute;color:rgba(255,255,255,.8);font-size:1rem;animation:snowfall linear infinite;z-index:1;pointer-events:none}
+@keyframes snowfall{from{transform:translateY(-30px) rotate(0deg);opacity:0}10%{opacity:1}to{transform:translateY(110vh) rotate(360deg);opacity:.3}}
+/* Lightning flash */
+.lightning{position:absolute;inset:0;z-index:1;background:rgba(255,255,200,0);animation:flash 5s ease-in-out infinite;pointer-events:none}
+@keyframes flash{0%,88%,92%,96%,100%{background:rgba(255,255,200,0)}90%,94%{background:rgba(255,255,200,0.12)}}
+/* Stars overlay for night */
+.star{position:absolute;background:#fff;border-radius:50%;animation:twinkle 3s ease-in-out infinite;z-index:1;pointer-events:none}
+@keyframes twinkle{0%,100%{opacity:.15;transform:scale(1)}50%{opacity:.9;transform:scale(1.4)}}
+
+.hero-content{position:relative;z-index:2;max-width:720px;padding:0 1rem}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:.5rem;
+  background:rgba(255,255,255,.75);border:1px solid rgba(56,189,248,.3);
+  color:var(--sky-dark,#0284c7);border-radius:50px;padding:.35rem 1.1rem;
+  font-size:.78rem;font-weight:700;letter-spacing:.06em;margin-bottom:1.2rem;
+  backdrop-filter:blur(8px);animation:fadeUp .8s ease both;
+}
+.sky-dark{color:#0284c7}
+.hero-title{
+  font-size:clamp(2.4rem,7vw,4.8rem);font-weight:800;line-height:1.06;
+  letter-spacing:-2px;margin-bottom:1rem;color:var(--text-dark);
+  animation:fadeUp .85s ease .1s both;
+}
+.hero-title.night-text{color:#fff}
+.hero-title.dark-text{color:#e2e8f0}
+.hero-title .accent{color:var(--sky)}
+.hero-sub{
+  font-size:1rem;color:var(--text-mid);line-height:1.7;
+  max-width:500px;margin:0 auto 2rem;
+  animation:fadeUp .9s ease .2s both;
+}
+.hero-sub.light-sub{color:rgba(255,255,255,.8)}
+
+/* HERO SEARCH */
+.hero-search-wrap{
+  display:flex;align-items:center;
+  background:rgba(255,255,255,.92);border:2px solid var(--card-border);
+  border-radius:60px;overflow:hidden;max-width:500px;margin:0 auto 2rem;
+  box-shadow:var(--card-shadow);backdrop-filter:blur(8px);
+  transition:border-color var(--transition),box-shadow var(--transition);
+  animation:fadeUp 1s ease .3s both;
+}
+.hero-search-wrap:focus-within{border-color:var(--sky);box-shadow:0 0 0 4px rgba(56,189,248,.15)}
+.hero-search-wrap input{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--text-dark);font-size:.98rem;font-weight:500;
+  padding:.85rem 1.4rem;font-family:'Nunito',sans-serif;
+}
+.hero-search-wrap input::placeholder{color:#94a3b8}
+.hero-search-wrap button{
+  background:var(--text-dark);color:#fff;border:none;
+  padding:.7rem 1.5rem;border-radius:50px;margin:.3rem;
+  font-size:.88rem;font-weight:700;cursor:pointer;
+  transition:transform var(--transition),background var(--transition);
+  font-family:'Nunito',sans-serif;
+}
+.hero-search-wrap button:hover{background:#0f172a;transform:scale(1.04)}
+
+/* PROFESSION DROPDOWN + LOCATION BUTTON */
+.hero-controls{display:flex;gap:.8rem;flex-wrap:wrap;justify-content:center;margin-bottom:1.2rem;animation:fadeUp 1s ease .25s both}
+.hero-profession{
+  background:rgba(255,255,255,.92);border:2px solid rgba(255,255,255,.5);
+  color:var(--text-dark);padding:.65rem 1.2rem;border-radius:50px;
+  font-family:'Nunito',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;
+  outline:none;backdrop-filter:blur(8px);
+  transition:border-color var(--transition),box-shadow var(--transition);
+  min-width:180px;
+}
+.hero-profession:focus{border-color:var(--sky);box-shadow:0 0 0 3px rgba(56,189,248,.18)}
+.hero-profession option{background:#fff;color:var(--text-dark)}
+.hero-locate-btn{
+  background:rgba(255,255,255,.92);border:2px solid rgba(255,255,255,.5);
+  color:var(--text-dark);padding:.65rem 1.3rem;border-radius:50px;
+  font-family:'Nunito',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;
+  backdrop-filter:blur(8px);display:flex;align-items:center;gap:.5rem;
+  transition:transform var(--transition),box-shadow var(--transition),background var(--transition);
+  white-space:nowrap;
+}
+.hero-locate-btn:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.15);background:#fff}
+.hero-locate-btn.loading{opacity:.7;pointer-events:none}
+.locate-pulse{animation:pulse 1s infinite}
+#hero-result{display:none;animation:fadeUp .5s ease both;margin-top:1.8rem}
+.hero-weather-card{
+  background:#fff;border-radius:var(--radius);
+  border:1px solid var(--card-border);
+  box-shadow:0 8px 40px rgba(0,0,0,.18);
+  overflow:hidden;max-width:520px;margin:0 auto;
+  text-align:left;
+}
+/* top photo strip */
+.hw-photo{
+  height:160px;position:relative;
+  background-size:cover;background-position:center;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  padding:1rem 1.2rem;
+}
+.hw-photo::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.15) 0%,rgba(0,0,0,.55) 100%);
+}
+.hw-photo-left{position:relative;z-index:1}
+.hw-photo-right{position:relative;z-index:1;text-align:right}
+.hw-temp{font-family:'Playfair Display',serif;font-size:3.8rem;font-weight:800;color:#fff;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.3)}
+.hw-feels{font-size:.75rem;color:rgba(255,255,255,.8);font-weight:600;margin-top:.1rem}
+.hw-icon-big{font-size:3rem;line-height:1;filter:drop-shadow(0 2px 8px rgba(0,0,0,.3));display:block;margin-bottom:.2rem}
+.hw-cond-overlay{font-size:.82rem;color:rgba(255,255,255,.92);font-weight:700}
+/* body below photo */
+.hw-body{padding:1.1rem 1.2rem}
+.hw-city-row{display:flex;align-items:baseline;gap:.5rem;margin-bottom:1rem}
+.hw-city{font-size:1.15rem;font-weight:900;color:var(--text-dark)}
+.hw-country{font-size:.78rem;color:var(--text-light);font-weight:600}
+/* labeled stats grid */
+.hw-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem;margin-bottom:.9rem}
+.hw-stat{background:var(--off-white);border-radius:12px;padding:.6rem .7rem;text-align:center}
+.hw-stat .k{font-size:.62rem;color:var(--text-light);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:.2rem;font-weight:700}
+.hw-stat .v{font-size:.92rem;font-weight:800;color:var(--text-dark);display:block}
+/* second row — extra stats */
+.hw-stats2{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem;margin-bottom:.9rem}
+.hw-ai{
+  background:linear-gradient(135deg,var(--sky-light),var(--orange-light));
+  border-radius:12px;padding:.7rem 1rem;
+  font-size:.82rem;color:#0369a1;font-weight:700;line-height:1.5;
+  display:flex;gap:.5rem;align-items:flex-start;
+}
+
+/* ===================== SECTION SHARED ===================== */
+section{min-height:90vh;display:flex;flex-direction:column;justify-content:center;padding:6rem 5%}
+.section-label{
+  font-size:.72rem;font-weight:800;letter-spacing:.15em;text-transform:uppercase;
+  color:var(--sky-dark,#0284c7);margin-bottom:.6rem;
+}
+.section-title{font-size:clamp(1.9rem,4vw,2.8rem);font-weight:800;letter-spacing:-1px;margin-bottom:.7rem;color:var(--text-dark)}
+.section-sub{color:var(--text-mid);font-size:.95rem;max-width:520px;line-height:1.7;margin-bottom:2.5rem}
+
+/* ===================== POPULAR CITIES ===================== */
+#cities{background:var(--cream)}
+.cities-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.2rem}
+
+/* PICTORIAL CITY CARD (like the reference image) */
+.city-card{
+  background:#fff;border-radius:var(--radius);
+  border:1px solid var(--card-border);
+  overflow:hidden;
+  box-shadow:var(--card-shadow);
+  transition:transform var(--transition),box-shadow var(--transition);
+  cursor:default;
+}
+.city-card:hover{transform:translateY(-6px);box-shadow:var(--card-shadow-hover)}
+.city-card-img{
+  height:110px;position:relative;overflow:hidden;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  padding:.8rem 1rem;
+}
+/* city weather scene bg */
+.city-card-img.bg-clear-day{background:linear-gradient(160deg,#87ceeb,#ffd700 100%)}
+.city-card-img.bg-clear-night{background:linear-gradient(160deg,#0d1b2a,#1a3050 100%)}
+.city-card-img.bg-cloudy{background:linear-gradient(160deg,#b0c4d8,#d4dfe8 100%)}
+.city-card-img.bg-rainy{background:linear-gradient(160deg,#4a6080,#8fa3b5 100%)}
+.city-card-img.bg-storm{background:linear-gradient(160deg,#2c3340,#4e5f6e 100%)}
+.city-card-img.bg-snowy{background:linear-gradient(160deg,#c5d8e8,#edf3f8 100%)}
+.city-card-img.bg-foggy{background:linear-gradient(160deg,#b8c4cc,#dde3e8 100%)}
+
+.city-time{font-size:.72rem;font-weight:700;color:rgba(255,255,255,.9);position:absolute;top:.7rem;right:.8rem;background:rgba(0,0,0,.22);padding:.15rem .5rem;border-radius:50px}
+.city-big-icon{font-size:2.8rem;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,.2))}
+.city-temp-overlay{font-family:'Playfair Display',serif;font-size:2.2rem;font-weight:800;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.25);line-height:1}
+
+.city-body{padding:1rem}
+.city-name{font-size:1rem;font-weight:800;color:var(--text-dark)}
+.city-cond{font-size:.75rem;color:var(--text-light);margin-bottom:.8rem;font-weight:500}
+.city-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.8rem}
+.city-stat{background:var(--off-white);border-radius:10px;padding:.45rem .5rem;text-align:center}
+.city-stat .k{font-size:.6rem;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.15rem}
+.city-stat .v{font-size:.82rem;font-weight:800;color:var(--text-dark)}
+.city-ai-pill{
+  background:linear-gradient(135deg,var(--sky-light),var(--orange-light));
+  border-radius:10px;padding:.5rem .7rem;
+  font-size:.73rem;color:var(--text-mid);font-weight:600;line-height:1.4;
+  display:flex;gap:.4rem;align-items:flex-start;
+}
+.city-ai-pill::before{content:'💡';flex-shrink:0;font-size:.8rem}
+
+/* ===================== DAILY FORECAST ===================== */
+#daily{background:#fff}
+.forecast-controls{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:2rem;align-items:center}
+.fc-wrap{
+  flex:1;min-width:240px;display:flex;align-items:center;
+  background:#fff;border:2px solid var(--card-border);border-radius:50px;overflow:hidden;
+  box-shadow:var(--card-shadow);transition:border-color var(--transition),box-shadow var(--transition);
+}
+.fc-wrap:focus-within{border-color:var(--sky);box-shadow:0 0 0 4px rgba(56,189,248,.12)}
+.fc-wrap input{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--text-dark);font-size:.92rem;font-weight:500;padding:.8rem 1.3rem;
+  font-family:'Nunito',sans-serif;
+}
+.fc-wrap input::placeholder{color:#94a3b8}
+.fc-wrap button{
+  background:var(--text-dark);color:#fff;border:none;
+  padding:.62rem 1.3rem;border-radius:50px;margin:.25rem;
+  font-size:.85rem;font-weight:700;cursor:pointer;
+  transition:transform var(--transition);font-family:'Nunito',sans-serif;
+}
+.fc-wrap button:hover{transform:scale(1.04)}
+.fc-select{
+  background:#fff;border:2px solid var(--card-border);
+  color:var(--text-dark);padding:.8rem 1.2rem;border-radius:50px;
+  font-family:'Nunito',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;
+  outline:none;box-shadow:var(--card-shadow);transition:border-color var(--transition);
+}
+.fc-select:focus{border-color:var(--sky)}
+
+/* PICTORIAL DAY CARD */
+.daily-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1.2rem}
+.day-card{
+  background:#fff;border-radius:var(--radius);border:1px solid var(--card-border);
+  overflow:hidden;box-shadow:var(--card-shadow);
+  transition:transform var(--transition),box-shadow var(--transition);
+}
+.day-card:hover{transform:translateY(-6px);box-shadow:var(--card-shadow-hover)}
+/* photo strip — same pattern as city card */
+.day-photo{
+  height:120px;position:relative;overflow:hidden;
+  background-size:cover;background-position:center;
+  display:flex;align-items:flex-end;justify-content:space-between;
+  padding:.8rem 1rem;
+}
+.day-photo::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.1) 0%,rgba(0,0,0,.52) 100%)}
+.day-photo-left{position:relative;z-index:1}
+.day-photo-right{position:relative;z-index:1;text-align:right}
+.day-temp-big{font-family:'Playfair Display',serif;font-size:2.4rem;font-weight:800;color:#fff;line-height:1;text-shadow:0 2px 8px rgba(0,0,0,.25)}
+.day-lo-overlay{font-size:.75rem;color:rgba(255,255,255,.75);font-weight:600;margin-top:.1rem}
+.day-icon-big{font-size:2.4rem;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,.25));display:block;margin-bottom:.2rem}
+.day-cond-overlay{font-size:.75rem;color:rgba(255,255,255,.9);font-weight:700}
+/* card body */
+.day-card-body{padding:.9rem 1rem}
+.day-date{font-size:.68rem;color:var(--text-light);font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem}
+.day-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.6rem}
+.day-stat{background:var(--off-white);border-radius:10px;padding:.45rem .4rem;text-align:center}
+.day-stat .k{font-size:.58rem;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.15rem;font-weight:700}
+.day-stat .v{font-size:.8rem;font-weight:800;color:var(--text-dark);display:block}
+.day-ai{background:linear-gradient(135deg,#fffbeb,#fff7ed);border-radius:10px;padding:.55rem .7rem;font-size:.72rem;color:#92400e;font-weight:600;line-height:1.4;display:flex;gap:.35rem;align-items:flex-start}
+.day-ai::before{content:'🤖';font-size:.75rem;flex-shrink:0}
+.placeholder-msg{color:var(--text-light);font-size:.95rem;text-align:center;padding:3rem;background:var(--off-white);border-radius:var(--radius);border:1.5px dashed var(--card-border)}
+
+/* ===================== HOURLY FORECAST ===================== */
+#hourly{background:var(--cream)}
+.hourly-controls{display:flex;align-items:center;gap:1rem;margin-bottom:2rem;flex-wrap:wrap}
+.hourly-controls input{
+  flex:1;min-width:180px;background:#fff;border:2px solid var(--card-border);
+  color:var(--text-dark);padding:.75rem 1.3rem;border-radius:50px;outline:none;
+  font-size:.92rem;font-weight:500;font-family:'Nunito',sans-serif;
+  box-shadow:var(--card-shadow);transition:border-color var(--transition);
+}
+.hourly-controls input:focus{border-color:var(--orange)}
+.hourly-controls button{
+  background:var(--orange);color:#fff;border:none;
+  padding:.75rem 1.5rem;border-radius:50px;font-size:.9rem;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 14px rgba(251,146,60,.3);
+  transition:transform var(--transition),box-shadow var(--transition);
+  font-family:'Nunito',sans-serif;
+}
+.hourly-controls button:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(251,146,60,.35)}
+
+/* Hourly temp chart bar area */
+.hourly-chart-area{
+  background:#fff;border-radius:var(--radius);border:1px solid var(--card-border);
+  padding:1.5rem;margin-bottom:1.5rem;box-shadow:var(--card-shadow);
+  overflow-x:auto;
+}
+.temp-chart{display:flex;align-items:flex-end;gap:0;height:80px;position:relative;min-width:600px}
+.temp-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.temp-bar{width:3px;background:linear-gradient(180deg,var(--orange),var(--orange-mid));border-radius:3px;transition:height .5s ease}
+.temp-bar-val{font-size:.65rem;font-weight:800;color:var(--orange)}
+
+/* Hourly cards scroll */
+.hourly-scroll{display:flex;gap:.9rem;overflow-x:auto;padding-bottom:.8rem}
+.hourly-scroll::-webkit-scrollbar{height:5px}
+.hourly-scroll::-webkit-scrollbar-track{background:rgba(0,0,0,.04);border-radius:4px}
+.hourly-scroll::-webkit-scrollbar-thumb{background:var(--orange-mid);border-radius:4px}
+
+/* PICTORIAL HOUR CARD */
+.hour-card{
+  flex-shrink:0;width:145px;
+  background:#fff;border-radius:var(--radius);border:1px solid var(--card-border);
+  overflow:hidden;box-shadow:var(--card-shadow);
+  transition:transform var(--transition),box-shadow var(--transition);
+}
+.hour-card:hover{transform:translateY(-5px);box-shadow:var(--card-shadow-hover)}
+.hour-photo{
+  height:85px;position:relative;overflow:hidden;
+  background-size:cover;background-position:center;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:.5rem;
+}
+.hour-photo::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.32)}
+.hour-time-label{position:relative;z-index:1;font-size:.68rem;font-weight:800;color:rgba(255,255,255,.92);margin-bottom:.2rem;letter-spacing:.03em}
+.hour-icon{position:relative;z-index:1;font-size:1.9rem;line-height:1;filter:drop-shadow(0 1px 4px rgba(0,0,0,.3))}
+.hour-card-body{padding:.65rem .7rem}
+.hour-temp{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:800;color:var(--text-dark);text-align:center;margin-bottom:.4rem}
+.hour-stats{display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.4rem}
+.hour-stat{background:var(--off-white);border-radius:8px;padding:.35rem .3rem;text-align:center}
+.hour-stat .k{font-size:.56rem;color:var(--text-light);text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:.1rem;font-weight:700}
+.hour-stat .v{font-size:.75rem;font-weight:800;color:var(--text-dark);display:block}
+.hour-ai{font-size:.62rem;color:var(--text-mid);font-weight:600;line-height:1.35;text-align:center;font-style:italic;background:var(--off-white);border-radius:8px;padding:.3rem .4rem}
+
+/* ===================== FEATURES ===================== */
+#features{background:#fff}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1.3rem}
+.feat-card{
+  background:var(--off-white);border:1.5px solid var(--card-border);
+  border-radius:var(--radius);padding:2rem 1.5rem;
+  transition:transform var(--transition),box-shadow var(--transition),background var(--transition);
+}
+.feat-card:hover{transform:translateY(-6px) scale(1.01);box-shadow:var(--card-shadow-hover);background:#fff}
+.feat-icon{
+  width:54px;height:54px;border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.5rem;margin-bottom:1.1rem;
+}
+.feat-icon.sky{background:var(--sky-light);border:1.5px solid rgba(56,189,248,.2)}
+.feat-icon.orange{background:var(--orange-light);border:1.5px solid rgba(251,146,60,.2)}
+.feat-icon.mint{background:var(--mint);border:1.5px solid rgba(52,211,153,.2)}
+.feat-icon.lav{background:var(--lavender);border:1.5px solid rgba(139,92,246,.2)}
+.feat-title{font-size:1rem;font-weight:800;margin-bottom:.5rem;color:var(--text-dark)}
+.feat-desc{font-size:.83rem;color:var(--text-mid);line-height:1.65}
+
+/* ===================== FAQ ===================== */
+#faq{background:var(--cream)}
+.faq-list{max-width:800px;display:flex;flex-direction:column;gap:.9rem}
+.faq-item{
+  background:#fff;border:1.5px solid var(--card-border);border-radius:16px;overflow:hidden;
+  transition:border-color var(--transition),box-shadow var(--transition);
+}
+.faq-item:hover{border-color:rgba(56,189,248,.35);box-shadow:0 4px 20px rgba(56,189,248,.08)}
+.faq-q{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:1.2rem 1.5rem;cursor:pointer;gap:1rem;user-select:none;
+}
+.faq-q span{font-size:.95rem;font-weight:700;color:var(--text-dark);line-height:1.4}
+.faq-arr{
+  flex-shrink:0;width:28px;height:28px;border-radius:50%;
+  background:var(--sky-light);border:1px solid rgba(56,189,248,.2);
+  display:flex;align-items:center;justify-content:center;
+  transition:transform var(--transition),background var(--transition);
+  color:#0284c7;font-size:.75rem;
+}
+.faq-item.open .faq-arr{transform:rotate(180deg);background:var(--sky);color:#fff}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .45s cubic-bezier(.4,0,.2,1)}
+.faq-a p{font-size:.88rem;color:var(--text-mid);line-height:1.7;padding:.2rem 1.5rem 1.2rem}
+.faq-item.open .faq-a{max-height:300px}
+
+/* ===================== ABOUT / IMPACT ===================== */
+#about{background:#fff}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center}
+@media(max-width:768px){.about-grid{grid-template-columns:1fr}}
+.pillar-badges{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:1.8rem}
+.pillar-badge{
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:.4rem 1rem;border-radius:50px;font-size:.78rem;font-weight:800;
+  letter-spacing:.04em;
+}
+.pillar-badge.env{background:#d1fae5;color:#065f46;border:1.5px solid #6ee7b7}
+.pillar-badge.dig{background:var(--sky-light);color:#0369a1;border:1.5px solid var(--sky-mid)}
+.about-statement{font-size:1.05rem;color:var(--text-mid);line-height:1.8;margin-bottom:1.5rem}
+.impact-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.impact-stat{background:var(--off-white);border-radius:var(--radius);padding:1.2rem;text-align:center;border:1px solid var(--card-border)}
+.impact-stat .big{font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:var(--sky-dark,#0284c7);line-height:1}
+.impact-stat .lbl{font-size:.72rem;color:var(--text-light);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:.3rem}
+.about-visual{display:flex;flex-direction:column;gap:1rem}
+.about-card{
+  background:var(--off-white);border-radius:var(--radius);
+  border:1px solid var(--card-border);padding:1.2rem 1.4rem;
+  display:flex;align-items:flex-start;gap:1rem;
+  transition:transform var(--transition),box-shadow var(--transition);
+}
+.about-card:hover{transform:translateY(-3px);box-shadow:var(--card-shadow)}
+.about-card-icon{font-size:1.8rem;flex-shrink:0}
+.about-card-text h4{font-size:.9rem;font-weight:800;color:var(--text-dark);margin-bottom:.3rem}
+.about-card-text p{font-size:.8rem;color:var(--text-mid);line-height:1.55}
+
+/* ===================== SOLUTION BRIEF ===================== */
+#brief{background:var(--cream)}
+.brief-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.2rem}
+.brief-card{
+  background:#fff;border-radius:var(--radius);border:1px solid var(--card-border);
+  overflow:hidden;box-shadow:var(--card-shadow);
+  transition:transform var(--transition),box-shadow var(--transition);
+}
+.brief-card:hover{transform:translateY(-5px);box-shadow:var(--card-shadow-hover)}
+.brief-card-head{
+  padding:1.1rem 1.3rem;display:flex;align-items:center;gap:.8rem;
+  border-bottom:1px solid var(--card-border);
+}
+.brief-card-head .num{
+  width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.8rem;font-weight:900;flex-shrink:0;font-family:'Playfair Display',serif;
+}
+.brief-card-head .num.sky{background:var(--sky-light);color:#0369a1}
+.brief-card-head .num.orange{background:var(--orange-light);color:#c2410c}
+.brief-card-head .num.mint{background:var(--mint);color:#065f46}
+.brief-card-head .num.lav{background:var(--lavender);color:#5b21b6}
+.brief-card-head .num.rose{background:var(--rose);color:#9f1239}
+.brief-card-head h4{font-size:.95rem;font-weight:800;color:var(--text-dark)}
+.brief-card-body{padding:1rem 1.3rem}
+.brief-card-body p{font-size:.84rem;color:var(--text-mid);line-height:1.65}
+.brief-card-body ul{margin-top:.5rem;padding-left:1.1rem;display:flex;flex-direction:column;gap:.3rem}
+.brief-card-body ul li{font-size:.82rem;color:var(--text-mid);line-height:1.5}
+
+/* ===================== FOOTER ===================== */
+footer{
+  background:var(--text-dark);color:var(--off-white);
+  padding:2.5rem 5%;
+}
+.footer-top{display:flex;flex-wrap:wrap;gap:1.5rem;align-items:flex-start;justify-content:space-between;padding-bottom:1.5rem;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:1.2rem}
+.footer-logo{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:800;color:var(--sky);margin-bottom:.3rem}
+.footer-tagline{font-size:.78rem;color:#64748b}
+.footer-meta{text-align:right}
+.footer-author{font-size:.9rem;font-weight:700;color:var(--off-white);margin-bottom:.2rem}
+.footer-sub{font-size:.75rem;color:#64748b;line-height:1.6}
+.footer-nextgen{display:flex;align-items:center;gap:.5rem;margin-top:.6rem;justify-content:flex-end}
+.footer-nextgen-badge{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:.35rem .8rem;font-size:.72rem;color:#94a3b8;font-weight:600}
+.footer-nextgen-badge span{color:#4ade80;font-weight:800}
+.footer-bottom{display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;align-items:center}
+footer .copy{font-size:.75rem;color:#475569}
+.footer-pillars{display:flex;gap:.5rem;flex-wrap:wrap}
+.fpill{font-size:.7rem;font-weight:700;padding:.25rem .7rem;border-radius:50px}
+.fpill.env{background:#064e3b;color:#6ee7b7}
+.fpill.dig{background:#0c2a3e;color:var(--sky-mid)}
+
+/* ===================== ANIMATIONS ===================== */
+@keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+.reveal{opacity:0;transform:translateY(30px);transition:opacity .7s ease,transform .7s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.loading-pulse{animation:pulse 1.4s infinite;color:var(--text-light);font-size:.9rem;padding:2rem;text-align:center}
+@keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+/* ===================== RESPONSIVE ===================== */
+@media(max-width:768px){
+  .nav-links,.nav-cta{display:none}
+  .hamburger{display:flex}
+  section{padding:5rem 5%;min-height:auto}
+  .fc-select{width:100%}
+  .temp-chart{min-width:400px}
+  .hero-title{letter-spacing:-1px}
+}
+@media(max-width:480px){
+  .day-card-top{height:75px}
+  .cities-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ========= NAV ========= -->
+<nav>
+  <div class="nav-logo">Sky<span class="dot">.</span>Cast</div>
+  <ul class="nav-links">
+    <li><a href="#cities">Cities</a></li>
+    <li><a href="#daily">Daily</a></li>
+    <li><a href="#hourly">Hourly</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#faq">FAQ</a></li>
+  </ul>
+  <a href="#daily" class="nav-cta">Search Weather</a>
+  <div class="hamburger" id="hamburger"><span></span><span></span><span></span></div>
+</nav>
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#cities" onclick="closeMobile()">🌍 Popular Cities</a>
+  <a href="#daily" onclick="closeMobile()">📅 Daily Forecast</a>
+  <a href="#hourly" onclick="closeMobile()">🕐 Hourly Forecast</a>
+  <a href="#features" onclick="closeMobile()">⚡ Features</a>
+  <a href="#faq" onclick="closeMobile()">❓ FAQ</a>
+</div>
+
+<!-- ========= HERO ========= -->
+<section id="hero">
+  <!-- Real photo background layer -->
+  <div id="heroBg"></div>
+  <!-- Weather overlays on top of photo -->
+  <div class="rain-wrap" id="rainOverlay" style="display:none;z-index:1;pointer-events:none"></div>
+  <div id="snowOverlay" style="position:absolute;inset:0;z-index:1;pointer-events:none;display:none"></div>
+  <div class="lightning" id="lightningOverlay" style="display:none"></div>
+  <div id="starsOverlay" style="position:absolute;inset:0;z-index:1;pointer-events:none;display:none"></div>
+
+  <div class="hero-content">
+    <div class="hero-badge">✦ AI-Powered Weather Intelligence</div>
+    <h1 class="hero-title" id="heroTitle">The Smartest Way to<br><span class="accent">Check the Weather</span></h1>
+    <p class="hero-sub" id="heroSub">Real-time forecasts, hourly updates & AI-generated advice — tailored to your city, your day, your decisions.</p>
+
+    <!-- Profession + Location row -->
+    <div class="hero-controls">
+      <select class="hero-profession" id="professionSelect">
+        <option value="general">👤 General</option>
+        <option value="farmer">🌾 Farmer</option>
+        <option value="student">📚 Student</option>
+        <option value="teacher">🏫 Teacher</option>
+        <option value="trader">🛒 Trader / Market</option>
+        <option value="commuter">🚗 Commuter</option>
+        <option value="driver">🚌 Driver / Transporter</option>
+        <option value="healthworker">🏥 Health Worker</option>
+        <option value="athlete">⚽ Athlete / Sportsperson</option>
+        <option value="photographer">📷 Photographer</option>
+      </select>
+      <button class="hero-locate-btn" id="locateBtn" onclick="detectLocation()">
+        📍 Use My Location
+      </button>
+    </div>
+
+    <!-- Search bar -->
+    <div class="hero-search-wrap">
+      <input type="text" id="heroInput" placeholder="Or search any city — e.g. Lagos, London…" />
+      <button onclick="heroSearch()">Search</button>
+    </div>
+    <div id="hero-result" id="heroCard"></div>
+  </div>
+</section>
+
+<!-- ========= POPULAR CITIES ========= -->
+<section id="cities">
+  <div class="reveal">
+    <div class="section-label">Live Now</div>
+    <h2 class="section-title">Popular Cities</h2>
+    <p class="section-sub">Real-time weather snapshots with AI-powered insights for each location.</p>
+  </div>
+  <div class="cities-grid reveal" id="citiesGrid">
+    <div class="loading-pulse">⏳ Loading city weather…</div>
+  </div>
+</section>
+
+<!-- ========= DAILY FORECAST ========= -->
+<section id="daily">
+  <div class="reveal">
+    <div class="section-label">Forecast</div>
+    <h2 class="section-title">Daily Forecast</h2>
+    <p class="section-sub">Search any city and pick your time window — pictorial day-by-day forecasts with AI advice.</p>
+  </div>
+  <div class="forecast-controls reveal">
+    <div class="fc-wrap">
+      <input type="text" id="dailyInput" placeholder="Enter city name…" onkeydown="if(event.key==='Enter')fetchDaily()"/>
+      <button onclick="fetchDaily()">Get Forecast</button>
+    </div>
+    <select class="fc-select" id="dailyDays" onchange="if(document.getElementById('dailyInput').value)fetchDaily()">
+      <option value="1">Tomorrow</option>
+      <option value="2">Next 2 Days</option>
+      <option value="3" selected>Next 3 Days</option>
+    </select>
+    <select class="fc-select" id="dailyProfession">
+      <option value="general">👤 General</option>
+      <option value="farmer">🌾 Farmer</option>
+      <option value="student">📚 Student</option>
+      <option value="teacher">🏫 Teacher</option>
+      <option value="trader">🛒 Trader</option>
+      <option value="commuter">🚗 Commuter</option>
+      <option value="driver">🚌 Driver</option>
+      <option value="healthworker">🏥 Health Worker</option>
+      <option value="athlete">⚽ Athlete</option>
+      <option value="photographer">📷 Photographer</option>
+    </select>
+  </div>
+  <div class="daily-grid reveal" id="dailyGrid">
+    <div class="placeholder-msg">🔍 Search a city above to see the daily forecast</div>
+  </div>
+</section>
+
+<!-- ========= HOURLY FORECAST ========= -->
+<section id="hourly">
+  <div class="reveal">
+    <div class="section-label">Hour by Hour</div>
+    <h2 class="section-title">Hourly Forecast</h2>
+    <p class="section-sub">Plan your next 12 hours with precision. Temperature chart + per-hour cards with AI tips.</p>
+  </div>
+  <div class="hourly-controls reveal">
+    <input type="text" id="hourlyInput" placeholder="Enter city for hourly forecast…" onkeydown="if(event.key==='Enter')fetchHourly()"/>
+    <select class="fc-select" id="hourlyProfession">
+      <option value="general">👤 General</option>
+      <option value="farmer">🌾 Farmer</option>
+      <option value="student">📚 Student</option>
+      <option value="teacher">🏫 Teacher</option>
+      <option value="trader">🛒 Trader</option>
+      <option value="commuter">🚗 Commuter</option>
+      <option value="driver">🚌 Driver</option>
+      <option value="healthworker">🏥 Health Worker</option>
+      <option value="athlete">⚽ Athlete</option>
+      <option value="photographer">📷 Photographer</option>
+    </select>
+    <button onclick="fetchHourly()">Show Hours</button>
+  </div>
+  <div id="hourlyChartWrap" class="reveal" style="display:none">
+    <div class="hourly-chart-area">
+      <div class="temp-chart" id="tempChart"></div>
+    </div>
+  </div>
+  <div class="hourly-scroll reveal" id="hourlyScroll">
+    <div class="placeholder-msg" style="width:100%;white-space:nowrap">⏰ Enter a city to view hourly data</div>
+  </div>
+</section>
+
+<!-- ========= FEATURES ========= -->
+<section id="features">
+  <div class="reveal">
+    <div class="section-label">Why SkyCast</div>
+    <h2 class="section-title">Built Different</h2>
+    <p class="section-sub">Most weather apps show you numbers. SkyCast tells you what to do with them.</p>
+  </div>
+  <div class="features-grid reveal">
+    <div class="feat-card">
+      <div class="feat-icon sky">🤖</div>
+      <div class="feat-title">Smart AI Advice</div>
+      <div class="feat-desc">Every forecast comes with a dynamic AI-generated tip based on temperature, humidity, wind, and conditions — never the same twice.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon orange">⚡</div>
+      <div class="feat-title">Real-Time Data</div>
+      <div class="feat-desc">Powered by OpenWeatherMap — trusted by millions of developers. Accurate, fast, and updated every few minutes worldwide.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon mint">🌍</div>
+      <div class="feat-title">Multi-City Tracking</div>
+      <div class="feat-desc">Pre-loaded Nigerian & global cities. Search any city with smart normalization — even partial or local names work.</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon lav">🎨</div>
+      <div class="feat-title">Dynamic Backgrounds</div>
+      <div class="feat-desc">The hero changes with the weather — sunny skies, animated rain, snow, night stars — the app feels alive with each condition.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========= FAQ ========= -->
+<section id="faq">
+  <div class="reveal">
+    <div class="section-label">Got Questions?</div>
+    <h2 class="section-title">FAQ</h2>
+    <p class="section-sub">Everything you need to know about SkyCast.</p>
+  </div>
+  <div class="faq-list reveal" id="faqList"></div>
+</section>
+
+<!-- ========= FOOTER ========= -->
+<footer>
+  <div class="footer-top">
+    <div>
+      <div class="footer-logo">Sky.Cast 🌤️</div>
+      <div class="footer-tagline">Smart Weather for Every Nigerian</div>
+    </div>
+    <div class="footer-meta">
+      <div class="footer-author">Adelusi Korede Oluwakorede</div>
+      <div class="footer-sub">Powered by OpenWeatherMap · Built with ❤️</div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="copy">© 2025 SkyCast — All rights reserved</div>
+    <div class="footer-pillars">
+      <div class="fpill env">🌿 Environment</div>
+      <div class="fpill dig">📡 Digital Inclusion</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ===================================================
+   ⚙️  CONFIG — paste your OpenWeatherMap API key here
+   =================================================== */
+const OWM_KEY = '9134277fb3eaa6f0a4c62db7138c263a';
+
+/* ===================================================
+   CITY ALIAS MAP
+   =================================================== */
+const CITY_MAP={
+  'adebayo':'Ado-Ekiti','ado':'Ado-Ekiti','ado ekiti':'Ado-Ekiti',
+  'ekiti':'Ado-Ekiti','ekiti state':'Ado-Ekiti',
+  'fct':'Abuja','federal capital territory':'Abuja',
+  'ph':'Port Harcourt','port harcourt':'Port Harcourt',
+  'kano state':'Kano','ibadan':'Ibadan',
+  'lag':'Lagos','lagos state':'Lagos',
+  'ny':'New York','nyc':'New York','new york city':'New York',
+  'london uk':'London','london england':'London',
+};
+function normalizeCity(raw){
+  const lower=raw.trim().toLowerCase();
+  return CITY_MAP[lower]||raw.trim();
+}
+
+/* ===================================================
+   WEATHER CODE → ICON / CONDITION / SCENE
+   =================================================== */
+function owmToScene(id,isNight){
+  if(id>=200&&id<300)return{icon:'⛈️',cond:'Thunderstorm',scene:'storm',bgClass:'bg-storm'};
+  if(id>=300&&id<400)return{icon:'🌦️',cond:'Drizzle',scene:'rainy',bgClass:'bg-rainy'};
+  if(id>=500&&id<600)return{icon:'🌧️',cond:'Rain',scene:'rainy',bgClass:'bg-rainy'};
+  if(id>=600&&id<700)return{icon:'❄️',cond:'Snow',scene:'snowy',bgClass:'bg-snowy'};
+  if(id===701||id===741)return{icon:'🌫️',cond:'Foggy',scene:'foggy',bgClass:'bg-foggy'};
+  if(id>=700&&id<800)return{icon:'🌫️',cond:'Haze/Mist',scene:'foggy',bgClass:'bg-foggy'};
+  if(id===800)return isNight?{icon:'🌙',cond:'Clear Night',scene:'clear-night',bgClass:'bg-clear-night'}:{icon:'☀️',cond:'Clear Sky',scene:'clear-day',bgClass:'bg-clear-day'};
+  if(id===801||id===802)return{icon:'⛅',cond:'Partly Cloudy',scene:'cloudy',bgClass:'bg-cloudy'};
+  return{icon:'☁️',cond:'Cloudy',scene:'cloudy',bgClass:'bg-cloudy'};
+}
+function isNightTime(){const h=new Date().getHours();return h>=19||h<6}
+
+/* ===================================================
+   AI ADVICE ENGINE — profession-aware
+   =================================================== */
+function aiAdvice(temp,humidity,wind,condLabel,profession='general'){
+  const hot=temp>=33, warm=temp>=26&&temp<33, cool=temp<20, cold=temp<10;
+  const humid=humidity>=75, windy=wind>=25;
+  const rainy=/rain|drizzle|shower/i.test(condLabel);
+  const stormy=/thunder|storm/i.test(condLabel);
+  const foggy=/fog|haze|mist/i.test(condLabel);
+  const snowy=/snow/i.test(condLabel);
+  const sunny=/clear|sunny/i.test(condLabel);
+  const night=/night/i.test(condLabel);
+
+  // ── PROFESSION-SPECIFIC ADVICE ──────────────────────────────────────────
+  if(profession==='farmer'){
+    if(stormy) return"⚡ Dangerous conditions. Stay off the farm — lightning and flooding risk is very high.";
+    if(rainy&&windy) return"🌧️ Heavy rain and wind. Secure crops and avoid harvesting today.";
+    if(rainy) return"☔ Good rain for crops, but delay any planting or spraying until it clears.";
+    if(hot&&humid) return"🌡️ High heat and humidity — water crops early morning. Avoid fieldwork between 12–4 PM.";
+    if(hot) return"☀️ Very hot day. Irrigate early, cover seedlings, and stay hydrated while working.";
+    if(cool&&windy) return"🌬️ Cool and windy — good day for light field tasks. Cover tender plants overnight.";
+    if(snowy) return"❄️ Frost risk. Protect crops with covers and check livestock shelter.";
+    if(foggy) return"🌫️ Foggy morning — good for moisture-loving crops. Visibility low, work carefully.";
+    if(warm&&sunny) return"😎 Excellent farming weather. Great day for planting, weeding, or harvesting.";
+    return"🌱 Moderate conditions. A good day for general farm work.";
+  }
+  if(profession==='student'){
+    if(stormy) return"⚡ Severe storm. If classes aren't cancelled, leave early and avoid shortcuts through open fields.";
+    if(rainy) return"🎒 Rain today — pack your bag the night before and carry an umbrella. Avoid wet shortcuts.";
+    if(hot&&humid) return"😓 Hot and humid. Wear light breathable clothes to school. Stay hydrated between classes.";
+    if(hot) return"☀️ Very hot. Apply sunscreen if you walk to school. Drink water regularly.";
+    if(foggy) return"🌫️ Low visibility this morning — leave earlier than usual, especially if you cycle.";
+    if(cool) return"🧥 Cool day — layer up for early morning classes. Conditions improve later.";
+    if(warm&&sunny) return"😎 Lovely weather. Great day to study outside or head to the sports field after school.";
+    if(windy) return"💨 Windy — hold on to loose papers and notes! Great day to be outdoors though.";
+    return"📚 Good conditions today. Focus up — weather won't be your excuse!";
+  }
+  if(profession==='teacher'){
+    if(stormy) return"⚡ Severe weather. Consider rescheduling outdoor activities and advise students on safe routes.";
+    if(rainy) return"🌧️ Rainy day — expect some students to arrive late. Plan indoor activities for breaks.";
+    if(hot&&humid) return"🌡️ Hot and humid. Ensure classroom ventilation is adequate and students stay hydrated.";
+    if(hot) return"☀️ Very hot. Avoid outdoor duties at midday. Keep windows open and fans running.";
+    if(cool) return"🧥 Cool today. Remind students to dress warmly for outdoor activities.";
+    if(foggy) return"🌫️ Foggy morning — some students may arrive late due to poor visibility. Plan accordingly.";
+    if(warm&&sunny) return"🏫 Beautiful day. Consider an outdoor lesson or activity — fresh air boosts focus.";
+    return"✏️ Comfortable conditions. A good day for a productive classroom session.";
+  }
+  if(profession==='trader'){
+    if(stormy) return"⚡ Dangerous storm. Close up your stall and secure your goods — do not risk it today.";
+    if(rainy&&windy) return"🌧️ Heavy rain and wind. Cover your goods tightly and weigh down lightweight items.";
+    if(rainy) return"☔ Rain expected. Cover your display goods and keep packaging dry. Customer traffic may drop.";
+    if(hot&&humid) return"🌡️ Hot and humid — perishable goods spoil faster today. Sell or store them early.";
+    if(hot) return"☀️ Very hot. Keep perishables in shade or cool storage. Stay hydrated and use an umbrella.";
+    if(foggy) return"🌫️ Foggy morning — fewer early customers. Use the time to arrange your stall well.";
+    if(warm&&sunny) return"😎 Good market weather. Expect decent foot traffic today — set up early!";
+    if(cool) return"🧥 Cool day — a good time to sell warm food, drinks, or clothing items.";
+    return"🛒 Moderate conditions. Steady day for business — stay consistent.";
+  }
+  if(profession==='commuter'){
+    if(stormy) return"⚡ Severe storm. Leave very early or delay travel. Avoid flooded roads and open bus stops.";
+    if(rainy&&windy) return"🌧️ Rainy and windy commute ahead. Allow extra time — traffic will be heavier than usual.";
+    if(rainy) return"☔ Rain on your commute. Leave earlier, carry an umbrella, and watch for waterlogged roads.";
+    if(foggy) return"🌫️ Low visibility. Drive slowly, use your headlights, and increase following distance.";
+    if(hot&&humid) return"😓 Hot and humid commute. Wear breathable clothing and carry water for the journey.";
+    if(hot) return"☀️ Very hot. If you walk any part of your commute, stay in the shade as much as possible.";
+    if(cool&&windy) return"🧣 Cool and windy. A jacket is essential for your journey this morning.";
+    if(warm&&sunny) return"😎 Smooth commute conditions. Roads should be clear — enjoy the ride.";
+    return"🚗 Decent commuting conditions today. Allow normal travel time.";
+  }
+  if(profession==='driver'){
+    if(stormy) return"⚡ Severe storm. Avoid highway driving if possible. Reduce speed drastically and use hazard lights.";
+    if(rainy&&windy) return"🌧️ Rain and wind — reduce speed, increase following distance, avoid flooded roads.";
+    if(rainy) return"☔ Wet roads today. Slow down, check tyre pressure, and watch for pedestrians without umbrellas.";
+    if(foggy) return"🌫️ Dense fog. Use fog lights, drive below 40km/h, and avoid overtaking.";
+    if(hot) return"🌡️ High heat — check coolant and tyre pressure before long trips. Carry drinking water.";
+    if(windy) return"💨 Strong winds. Take care with high-sided vehicles on open roads and bridges.";
+    if(snowy) return"❄️ Ice and snow risk. Avoid travel if possible or fit winter tyres. Brake slowly.";
+    if(warm&&sunny) return"☀️ Clear driving conditions. Good day for long-distance trips.";
+    return"🚌 Reasonable road conditions today. Drive safe and stay alert.";
+  }
+  if(profession==='healthworker'){
+    if(stormy) return"⚡ Storm warning. Ensure emergency routes to the facility are clear. Patients may be delayed.";
+    if(hot&&humid) return"🌡️ High heat-humidity index. Watch for heat exhaustion cases — increase patient hydration checks.";
+    if(hot) return"☀️ Very hot. Heatstroke risk rises today — monitor vulnerable patients closely.";
+    if(rainy) return"☔ Rain increases mosquito activity. Reinforce malaria prevention reminders for patients.";
+    if(cool&&windy) return"🧥 Cold and windy — expect a rise in respiratory complaints. Keep wards warm.";
+    if(foggy) return"🌫️ Poor visibility. Staff travelling early should allow extra commute time.";
+    if(warm&&sunny) return"😊 Good conditions. Encourage patients with mobility issues to get some sun exposure today.";
+    return"🏥 Stable weather conditions. Standard precautions apply today.";
+  }
+  if(profession==='athlete'){
+    if(stormy) return"⚡ Training cancelled — dangerous lightning risk. Take a rest day or train indoors.";
+    if(rainy&&windy) return"🌧️ Rough outdoor conditions. Move your session indoors or treat it as active recovery.";
+    if(rainy) return"☔ Light rain — manageable for training but surfaces will be slippery. Warm up longer.";
+    if(hot&&humid) return"🥵 Dangerous heat + humidity combination. Train early morning or evening only. Hydrate heavily.";
+    if(hot) return"☀️ Very hot. Train before 8 AM or after 6 PM. Electrolyte drinks are essential today.";
+    if(cool&&windy) return"💨 Cool and windy — great for distance runs. Layer up for the warm-up, strip down to perform.";
+    if(cool) return"🏃 Cool conditions — ideal for high-intensity training. Your best performances come in this weather.";
+    if(warm&&sunny) return"😎 Perfect training weather. Push hard today — conditions are on your side.";
+    return"⚽ Decent conditions for training. Standard warm-up and hydration applies.";
+  }
+  if(profession==='photographer'){
+    if(stormy) return"⚡ Dangerous conditions. Protect your gear and stay safe — storm photos require proper shelter.";
+    if(rainy) return"📷 Overcast and rainy — perfect for moody, dramatic portraits. Puddle reflections are golden.";
+    if(foggy) return"🌫️ Exceptional fog light today! Misty landscapes and silhouettes will look stunning. Go shoot.";
+    if(hot&&sunny) return"☀️ Harsh midday light — avoid shooting 11 AM–3 PM. Golden hour (6–7 PM) will be spectacular.";
+    if(warm&&sunny) return"😎 Soft natural light today. Great for outdoor portraits and street photography.";
+    if(cool&&windy) return"💨 Dramatic skies and moving clouds — excellent for landscape and architectural shots.";
+    if(snowy) return"❄️ Snow scenes are rare and beautiful. Get out early for fresh, undisturbed shots.";
+    if(night) return"🌙 Clear night — perfect for astrophotography, long exposures, and city light trails.";
+    return"📸 Neutral light conditions. A reliable day for any type of shoot.";
+  }
+
+  // ── DEFAULT / GENERAL ADVICE ────────────────────────────────────────────
+  if(stormy) return"⚡ Severe weather. Stay indoors and avoid open areas.";
+  if(snowy) return"❄️ Snow expected. Bundle up and drive carefully.";
+  if(foggy) return"🌫️ Low visibility. Drive slowly and use fog lights.";
+  if(rainy&&windy) return"🌧️ Rainy and windy — hold your umbrella tight!";
+  if(rainy) return"☔ Rain expected. Carry an umbrella today.";
+  if(hot&&humid) return"🥵 Hot and humid. Stay hydrated and seek shade.";
+  if(hot) return"🌞 Very hot. Limit sun exposure between noon and 4 PM.";
+  if(warm&&sunny) return"😎 Beautiful conditions. Great time for outdoors!";
+  if(warm&&humid) return"💧 Warm and humid. Light clothing recommended.";
+  if(warm) return"🌤️ Pleasant weather. Enjoy your day comfortably.";
+  if(cool&&windy) return"🧣 Cool and windy. Wear a jacket and protect your ears.";
+  if(cool) return"🧥 Cool today. A light jacket will keep you comfortable.";
+  if(night) return"🌙 Clear night. Great for stargazing or an evening walk.";
+  if(windy) return"💨 Windy — secure loose items and hold on to hats!";
+  return"🌡️ Moderate conditions. Check back for updates.";
+}
+
+/* ===================================================
+   AUTO-DETECT LOCATION
+   =================================================== */
+async function detectLocation(){
+  const btn=document.getElementById('locateBtn');
+  if(!navigator.geolocation){
+    alert('Location access is not supported by your browser.');
+    return;
+  }
+  btn.innerHTML='<span class="locate-pulse">📍</span> Detecting…';
+  btn.classList.add('loading');
+  navigator.geolocation.getCurrentPosition(
+    async(pos)=>{
+      const {latitude:lat,longitude:lon}=pos.coords;
+      const result=document.getElementById('hero-result');
+      result.style.display='block';
+      result.innerHTML='<div class="loading-pulse" style="padding:2rem;background:#fff;border-radius:20px">⏳ Fetching your local weather…</div>';
+      try{
+        // Reverse geocode using OWM
+        const url=`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${OWM_KEY}&units=metric`;
+        const res=await fetch(url);
+        if(!res.ok) throw new Error('Could not fetch weather for your location');
+        const d=await res.json();
+        const id=d.weather[0].id;
+        const night=isNightTime();
+        const info=owmToScene(id,night);
+        const profession=document.getElementById('professionSelect').value;
+        const w={
+          name:d.name, country:d.sys.country,
+          temp:Math.round(d.main.temp),
+          feels:Math.round(d.main.feels_like),
+          humidity:d.main.humidity,
+          wind:Math.round(d.wind.speed*3.6),
+          visibility:d.visibility?Math.round(d.visibility/1000):null,
+          pressure:d.main.pressure,
+          dew:Math.round(d.main.temp-(100-d.main.humidity)/5),
+          cond:info.cond, icon:info.icon, scene:info.scene,
+          advice:aiAdvice(d.main.temp,d.main.humidity,d.wind.speed*3.6,info.cond,profession),
+          isNight:night,
+        };
+        const sceneName=sceneFromCondAndTime(w.scene,w.isNight);
+        setHeroScene(sceneName);
+        const photoUrl=HERO_PHOTOS[sceneName]||HERO_PHOTOS['clear-day'];
+        result.innerHTML=buildHeroCard(w,photoUrl,'📍 Your Location');
+      }catch(e){
+        result.innerHTML=`<div style="color:#ef4444;padding:1.5rem;background:#fff;border-radius:20px;font-weight:700">⚠️ ${e.message}</div>`;
+      }
+      btn.innerHTML='📍 Use My Location';
+      btn.classList.remove('loading');
+    },
+    (err)=>{
+      btn.innerHTML='📍 Use My Location';
+      btn.classList.remove('loading');
+      const msgs={1:'Location permission denied. Please allow access in your browser settings.',2:'Could not determine your location.',3:'Location request timed out.'};
+      alert(msgs[err.code]||'Location error. Try searching manually.');
+    },
+    {timeout:10000,enableHighAccuracy:true}
+  );
+}
+
+/* ===================================================
+   FETCH WEATHER — OpenWeatherMap current
+   =================================================== */
+async function fetchOWMCurrent(cityRaw){
+  const city=normalizeCity(cityRaw);
+  const url=`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${OWM_KEY}&units=metric`;
+  const res=await fetch(url);
+  if(!res.ok){const e=await res.json();throw new Error(e.message||'City not found')}
+  const d=await res.json();
+  const id=d.weather[0].id;
+  const night=isNightTime();
+  const info=owmToScene(id,night);
+  return{
+    name:d.name,country:d.sys.country,
+    temp:Math.round(d.main.temp),
+    feels:Math.round(d.main.feels_like),
+    humidity:d.main.humidity,
+    wind:Math.round(d.wind.speed*3.6),
+    visibility:d.visibility?Math.round(d.visibility/1000):null,
+    pressure:d.main.pressure,
+    uv:null,
+    dew:Math.round(d.main.temp-(100-d.main.humidity)/5),
+    cond:info.cond,icon:info.icon,scene:info.scene,bgClass:info.bgClass,
+    advice:aiAdvice(d.main.temp,d.main.humidity,d.wind.speed*3.6,info.cond,
+      (document.getElementById('professionSelect')?.value||'general')),
+    isNight:night,
+  };
+}
+
+/* ===================================================
+   FETCH FORECAST — OWM 5-day/3-hour
+   =================================================== */
+async function fetchOWMForecast(cityRaw){
+  const city=normalizeCity(cityRaw);
+  const url=`https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${OWM_KEY}&units=metric`;
+  const res=await fetch(url);
+  if(!res.ok){const e=await res.json();throw new Error(e.message||'City not found')}
+  return res.json();
+}
+
+/* ===================================================
+   HERO CARD BUILDER (reused by search + locate)
+   =================================================== */
+function buildHeroCard(w, photoUrl, locationLabel){
+  return`
+    <div class="hero-weather-card">
+      <div class="hw-photo" style="background-image:url('${photoUrl}')">
+        <div class="hw-photo-left">
+          <div class="hw-temp">${w.temp}°C</div>
+          <div class="hw-feels">Feels like ${w.feels}°C</div>
+        </div>
+        <div class="hw-photo-right">
+          <span class="hw-icon-big">${w.icon}</span>
+          <div class="hw-cond-overlay">${w.cond}</div>
+        </div>
+      </div>
+      <div class="hw-body">
+        <div class="hw-city-row">
+          <div class="hw-city">${locationLabel||w.name}</div>
+          <div class="hw-country">${w.country}</div>
+        </div>
+        <div class="hw-stats">
+          <div class="hw-stat"><span class="k">💨 Wind</span><span class="v">${w.wind} km/h</span></div>
+          <div class="hw-stat"><span class="k">💧 Humidity</span><span class="v">${w.humidity}%</span></div>
+          <div class="hw-stat"><span class="k">🌡️ Dew Point</span><span class="v">${w.dew}°C</span></div>
+        </div>
+        <div class="hw-stats2">
+          <div class="hw-stat"><span class="k">📊 Pressure</span><span class="v">${w.pressure} hPa</span></div>
+          ${w.visibility!==null?`<div class="hw-stat"><span class="k">👁️ Visibility</span><span class="v">${w.visibility} km</span></div>`:'<div class="hw-stat"><span class="k">👁️ Visibility</span><span class="v">N/A</span></div>'}
+          <div class="hw-stat"><span class="k">🕐 Updated</span><span class="v">Just now</span></div>
+        </div>
+        <div class="hw-ai">🤖 ${w.advice}</div>
+      </div>
+    </div>
+  `;
+}
+
+/* ===================================================
+   HERO SEARCH
+   =================================================== */
+async function heroSearch(){
+  const raw=document.getElementById('heroInput').value.trim();
+  if(!raw)return;
+  const result=document.getElementById('hero-result');
+  result.style.display='block';
+  result.innerHTML='<div class="loading-pulse" style="padding:2rem;background:#fff;border-radius:20px">⏳ Fetching weather…</div>';
+  try{
+    const profession=document.getElementById('professionSelect').value;
+    const url=`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(normalizeCity(raw))}&appid=${OWM_KEY}&units=metric`;
+    const res=await fetch(url);
+    if(!res.ok){const e=await res.json();throw new Error(e.message||'City not found')}
+    const d=await res.json();
+    const id=d.weather[0].id;
+    const night=isNightTime();
+    const info=owmToScene(id,night);
+    const w={
+      name:d.name, country:d.sys.country,
+      temp:Math.round(d.main.temp),
+      feels:Math.round(d.main.feels_like),
+      humidity:d.main.humidity,
+      wind:Math.round(d.wind.speed*3.6),
+      visibility:d.visibility?Math.round(d.visibility/1000):null,
+      pressure:d.main.pressure,
+      dew:Math.round(d.main.temp-(100-d.main.humidity)/5),
+      cond:info.cond, icon:info.icon, scene:info.scene, bgClass:info.bgClass,
+      advice:aiAdvice(d.main.temp,d.main.humidity,d.wind.speed*3.6,info.cond,profession),
+      isNight:night,
+    };
+    const sceneName=sceneFromCondAndTime(w.scene,w.isNight);
+    setHeroScene(sceneName);
+    const photoUrl=HERO_PHOTOS[sceneName]||HERO_PHOTOS['clear-day'];
+    result.innerHTML=buildHeroCard(w,photoUrl,w.name);
+  }catch(e){
+    result.innerHTML=`<div style="color:#ef4444;padding:1.5rem;background:#fff;border-radius:20px;font-weight:700">⚠️ ${e.message}</div>`;
+  }
+}
+document.getElementById('heroInput').addEventListener('keydown',e=>{if(e.key==='Enter')heroSearch()});
+
+/* ===================================================
+   HERO PHOTO BACKGROUND SWITCHER
+   Real sky photos from Unsplash (free, no key needed)
+   Change by: weather condition + time of day
+   =================================================== */
+const HERO_PHOTOS={
+  'clear-day'  :'https://images.unsplash.com/photo-1601297183305-6df142704ea2?w=1600&q=80', // bright blue sunny sky
+  'clear-morning':'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=1600&q=80', // sunrise golden sky
+  'clear-evening':'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&q=80', // sunset orange sky
+  'clear-night':'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1600&q=80', // starry night sky
+  'cloudy'     :'https://images.unsplash.com/photo-1553152531-b98a2fc8d3bf?w=1600&q=80', // overcast clouds
+  'rainy'      :'https://images.unsplash.com/photo-1534274988757-a28bf1a57c17?w=1600&q=80', // rain on window / rainy sky
+  'storm'      :'https://images.unsplash.com/photo-1504370805625-d32c54b16100?w=1600&q=80', // dramatic storm clouds
+  'snowy'      :'https://images.unsplash.com/photo-1478265409131-1f65c88f965c?w=1600&q=80', // snowy winter sky
+  'foggy'      :'https://images.unsplash.com/photo-1496716203738-44db9ae6d4e8?w=1600&q=80', // misty foggy landscape
+};
+
+let _currentScene=null;
+
+function setHeroScene(name){
+  if(name===_currentScene)return;
+  _currentScene=name;
+
+  const bg=document.getElementById('heroBg');
+  const photoUrl=HERO_PHOTOS[name]||HERO_PHOTOS['clear-day'];
+
+  // Preload image then crossfade
+  const img=new Image();
+  img.onload=()=>{
+    bg.style.backgroundImage=`url('${photoUrl}')`;
+    bg.style.opacity='1';
+  };
+  img.onerror=()=>{
+    // Fallback gradient if image fails
+    const fallbacks={
+      'clear-day':'linear-gradient(180deg,#87ceeb,#fef9f0)',
+      'clear-night':'linear-gradient(180deg,#0d1b2a,#2d4a6e)',
+      'cloudy':'linear-gradient(180deg,#b0c4d8,#e8eef3)',
+      'rainy':'linear-gradient(180deg,#4a6080,#8fa3b5)',
+      'storm':'linear-gradient(180deg,#2c3340,#4e5f6e)',
+      'snowy':'linear-gradient(180deg,#c5d8e8,#edf3f8)',
+      'foggy':'linear-gradient(180deg,#c8cfd6,#ebeef1)',
+    };
+    bg.style.background=fallbacks[name]||fallbacks['clear-day'];
+    bg.style.opacity='1';
+  };
+  bg.style.opacity='0';
+  setTimeout(()=>{ img.src=photoUrl; }, 150);
+
+  // Show/hide animated overlays on top of the photo
+  const rainOv=document.getElementById('rainOverlay');
+  const snowOv=document.getElementById('snowOverlay');
+  const lightOv=document.getElementById('lightningOverlay');
+  const starOv=document.getElementById('starsOverlay');
+  rainOv.style.display='none';
+  snowOv.style.display='none';
+  lightOv.style.display='none';
+  starOv.style.display='none';
+
+  if(name==='rainy'||name==='storm'){
+    if(rainOv.children.length===0) spawnRain(rainOv, name==='storm'?80:55);
+    rainOv.style.display='block';
+  }
+  if(name==='storm') lightOv.style.display='block';
+  if(name==='snowy'){
+    if(snowOv.children.length===0) spawnSnow(snowOv);
+    snowOv.style.display='block';
+  }
+  if(name==='clear-night'){
+    if(starOv.children.length===0) spawnStars(starOv);
+    starOv.style.display='block';
+  }
+
+  // All photos are dark enough for white text
+  const heroTitle=document.getElementById('heroTitle');
+  const heroSub=document.getElementById('heroSub');
+  heroTitle.style.color='#fff';
+  heroSub.style.color='rgba(255,255,255,.85)';
+}
+
+/* Pick the right scene key based on weather condition + time */
+function sceneFromCondAndTime(condOrScene, nightFlag){
+  const h=new Date().getHours();
+  // If called with an OWM scene name, map it:
+  if(condOrScene==='clear-day'||condOrScene==='clear-night'){
+    if(h>=5&&h<8)   return'clear-morning';
+    if(h>=17&&h<20) return'clear-evening';
+    if(h>=20||h<5)  return'clear-night';
+    return'clear-day';
+  }
+  return condOrScene; // rainy, storm, cloudy, snowy, foggy stay as-is
+}
+
+/* Auto scene by time only (before any search) */
+function autoSceneByTime(){
+  const h=new Date().getHours();
+  let scene;
+  if(h>=5&&h<8)   scene='clear-morning';
+  else if(h>=8&&h<17)  scene='clear-day';
+  else if(h>=17&&h<20) scene='clear-evening';
+  else                 scene='clear-night';
+  setHeroScene(scene);
+}
+
+/* ===== Overlay spawners ===== */
+function spawnRain(wrap,count){
+  for(let i=0;i<count;i++){
+    const d=document.createElement('div');
+    d.className='raindrop';
+    const h=15+Math.random()*25;
+    d.style.cssText=`height:${h}px;left:${Math.random()*100}%;animation-duration:${0.55+Math.random()*0.55}s;animation-delay:${Math.random()*2}s`;
+    wrap.appendChild(d);
+  }
+}
+function spawnSnow(wrap){
+  const fl=['❄','❅','❆','✻'];
+  for(let i=0;i<40;i++){
+    const s=document.createElement('div');
+    s.className='snowflake';
+    s.textContent=fl[i%fl.length];
+    s.style.cssText=`left:${Math.random()*100}%;top:-30px;font-size:${0.7+Math.random()*0.9}rem;animation-duration:${4+Math.random()*5}s;animation-delay:${Math.random()*6}s`;
+    wrap.appendChild(s);
+  }
+}
+function spawnStars(wrap){
+  for(let i=0;i<80;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    const sz=1+Math.random()*2.5;
+    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*85}%;left:${Math.random()*100}%;animation-delay:${Math.random()*4}s;animation-duration:${2+Math.random()*3}s`;
+    wrap.appendChild(s);
+  }
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  autoSceneByTime();
+  setInterval(autoSceneByTime, 60_000);
+});
+
+/* ===================================================
+   POPULAR CITIES
+   =================================================== */
+const POPULAR_CITIES=[
+  {label:'Lagos',sub:'Nigeria'},
+  {label:'Abuja',sub:'Nigeria'},
+  {label:'London',sub:'United Kingdom'},
+  {label:'New York',sub:'United States'},
+  {label:'Ado-Ekiti',sub:'Nigeria'},
+  {label:'Ibadan',sub:'Nigeria'},
+];
+async function loadCities(){
+  const grid=document.getElementById('citiesGrid');
+  grid.innerHTML='';
+  await Promise.allSettled(POPULAR_CITIES.map(async(c,i)=>{
+    try{
+      const w=await fetchOWMCurrent(c.label);
+      const now=new Date();
+      const timeStr=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      const card=document.createElement('div');
+      card.className='city-card';
+      card.innerHTML=`
+        <div class="city-card-img ${w.bgClass}">
+          <div class="city-time">${timeStr}</div>
+          <div class="city-big-icon">${w.icon}</div>
+          <div class="city-temp-overlay">${w.temp}°</div>
+        </div>
+        <div class="city-body">
+          <div class="city-name">${w.name}</div>
+          <div class="city-cond">${w.cond} · Feels like ${w.feels}°C</div>
+          <div class="city-stats">
+            <div class="city-stat"><span class="k">💨 Wind</span><span class="v">${w.wind}<br>km/h</span></div>
+            <div class="city-stat"><span class="k">💧 Humid</span><span class="v">${w.humidity}%</span></div>
+            <div class="city-stat"><span class="k">🌡️ Dew</span><span class="v">${w.dew}°C</span></div>
+          </div>
+          <div class="city-ai-pill">${w.advice}</div>
+        </div>
+      `;
+      grid.appendChild(card);
+    }catch(e){
+      const card=document.createElement('div');
+      card.className='city-card';
+      card.innerHTML=`
+        <div class="city-card-img bg-cloudy"></div>
+        <div class="city-body">
+          <div class="city-name">${c.label}</div>
+          <div class="city-ai-pill" style="color:#ef4444">⚠️ ${e.message||'Could not load'}</div>
+        </div>`;
+      grid.appendChild(card);
+    }
+  }));
+}
+
+/* ===================================================
+   DAILY FORECAST
+   =================================================== */
+const DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+async function fetchDaily(){
+  const raw=document.getElementById('dailyInput').value.trim();
+  if(!raw)return;
+  const days=parseInt(document.getElementById('dailyDays').value);
+  const grid=document.getElementById('dailyGrid');
+  grid.innerHTML='<div class="loading-pulse">⏳ Loading forecast…</div>';
+  try{
+    const data=await fetchOWMForecast(raw);
+    const list=data.list;
+    // Group by date
+    const byDate={};
+    list.forEach(item=>{
+      const date=item.dt_txt.split(' ')[0];
+      if(!byDate[date])byDate[date]=[];
+      byDate[date].push(item);
+    });
+    const dates=Object.keys(byDate).slice(1,days+1); // skip today
+    grid.innerHTML='';
+    dates.forEach(date=>{
+      const entries=byDate[date];
+      const temps=entries.map(e=>e.main.temp);
+      const maxT=Math.round(Math.max(...temps));
+      const minT=Math.round(Math.min(...temps));
+      const midEntry=entries[Math.floor(entries.length/2)];
+      const id=midEntry.weather[0].id;
+      const info=owmToScene(id,false);
+      const wind=Math.round(midEntry.wind.speed*3.6);
+      const humidity=midEntry.main.humidity;
+      const feels=Math.round(midEntry.main.feels_like);
+      const advice=aiAdvice((maxT+minT)/2,humidity,wind,info.cond,
+        document.getElementById('dailyProfession').value);
+      const d=new Date(date);
+      const dayLabel=`${DAY_NAMES[d.getDay()]}, ${d.getDate()} ${MON_NAMES[d.getMonth()]}`;
+      const photo=HERO_PHOTOS[info.scene]||HERO_PHOTOS['clear-day'];
+      const card=document.createElement('div');
+      card.className='day-card';
+      card.innerHTML=`
+        <div class="day-photo" style="background-image:url('${photo}')">
+          <div class="day-photo-left">
+            <div class="day-temp-big">${maxT}°C</div>
+            <div class="day-lo-overlay">Low ${minT}°C</div>
+          </div>
+          <div class="day-photo-right">
+            <span class="day-icon-big">${info.icon}</span>
+            <div class="day-cond-overlay">${info.cond}</div>
+          </div>
+        </div>
+        <div class="day-card-body">
+          <div class="day-date">${dayLabel}</div>
+          <div class="day-stats">
+            <div class="day-stat"><span class="k">💨 Wind</span><span class="v">${wind} km/h</span></div>
+            <div class="day-stat"><span class="k">💧 Humidity</span><span class="v">${humidity}%</span></div>
+            <div class="day-stat"><span class="k">🌡️ Feels</span><span class="v">${feels}°C</span></div>
+          </div>
+          <div class="day-ai">${advice}</div>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    grid.innerHTML=`<div class="placeholder-msg" style="color:#ef4444">⚠️ ${e.message}</div>`;
+  }
+}
+
+/* ===================================================
+   HOURLY FORECAST
+   =================================================== */
+async function fetchHourly(){
+  const raw=document.getElementById('hourlyInput').value.trim();
+  if(!raw)return;
+  const scroll=document.getElementById('hourlyScroll');
+  const chartWrap=document.getElementById('hourlyChartWrap');
+  const tempChart=document.getElementById('tempChart');
+  scroll.innerHTML='<div class="loading-pulse">⏳ Loading hourly data…</div>';
+  try{
+    const data=await fetchOWMForecast(raw);
+    const slots=data.list.slice(0,12);
+    // Build temp chart
+    const temps=slots.map(s=>Math.round(s.main.temp));
+    const minT=Math.min(...temps),maxT=Math.max(...temps);
+    const range=maxT-minT||1;
+    tempChart.innerHTML='';
+    slots.forEach((s,i)=>{
+      const t=Math.round(s.main.temp);
+      const pct=((t-minT)/range);
+      const h=Math.round(20+pct*55);
+      const wrap=document.createElement('div');
+      wrap.className='temp-bar-wrap';
+      wrap.innerHTML=`<div class="temp-bar-val">${t}°</div><div class="temp-bar" style="height:${h}px"></div>`;
+      tempChart.appendChild(wrap);
+    });
+    chartWrap.style.display='block';
+
+    // Build hour cards
+    scroll.innerHTML='';
+    slots.forEach((s,i)=>{
+      const t=Math.round(s.main.temp);
+      const id=s.weather[0].id;
+      const night=()=>{const h=new Date(s.dt*1000).getHours();return h>=19||h<6};
+      const info=owmToScene(id,night());
+      const wind=Math.round(s.wind.speed*3.6);
+      const humidity=s.main.humidity;
+      const pop=Math.round((s.pop||0)*100);
+      const advice=aiAdvice(t,humidity,wind,info.cond,
+        document.getElementById('hourlyProfession').value);
+      const timeStr=new Date(s.dt*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      const photo=HERO_PHOTOS[info.scene]||HERO_PHOTOS['clear-day'];
+      const card=document.createElement('div');
+      card.className='hour-card';
+      card.innerHTML=`
+        <div class="hour-photo" style="background-image:url('${photo}')">
+          <div class="hour-time-label">${i===0?'Now':timeStr}</div>
+          <div class="hour-icon">${info.icon}</div>
+        </div>
+        <div class="hour-card-body">
+          <div class="hour-temp">${t}°C</div>
+          <div class="hour-stats">
+            <div class="hour-stat"><span class="k">💧 Humid</span><span class="v">${humidity}%</span></div>
+            <div class="hour-stat"><span class="k">🌂 Rain</span><span class="v">${pop}%</span></div>
+            <div class="hour-stat"><span class="k">💨 Wind</span><span class="v">${wind} km/h</span></div>
+            <div class="hour-stat"><span class="k">☁️ Sky</span><span class="v">${info.cond.split(' ')[0]}</span></div>
+          </div>
+          <div class="hour-ai">${advice}</div>
+        </div>
+      `;
+      scroll.appendChild(card);
+    });
+  }catch(e){
+    chartWrap.style.display='none';
+    scroll.innerHTML=`<div class="placeholder-msg" style="color:#ef4444;width:100%">⚠️ ${e.message}</div>`;
+  }
+}
+
+/* ===================================================
+   FAQ
+   =================================================== */
+const FAQS=[
+  {q:"Where does SkyCast get its weather data?",a:"SkyCast uses OpenWeatherMap — trusted by over 3 million developers worldwide. It provides current weather, hourly and 5-day forecasts for millions of cities globally, updated every few minutes."},
+  {q:"How does the AI advice work?",a:"The AI advice engine analyzes real-time conditions — temperature, humidity, wind speed, and weather code — and generates dynamic, context-aware recommendations. No two weather situations produce the same advice."},
+  {q:"Can I search for small Nigerian cities?",a:"Yes! SkyCast includes a smart city normalization map. You can type 'Ekiti', 'Adebayo', 'Ado' or 'FCT' and we resolve them correctly. OpenWeatherMap supports thousands of Nigerian cities beyond our preloaded list."},
+  {q:"Why does the hero background change?",a:"SkyCast reads the current weather conditions and time of day when you search. Sunny? Clear blue sky with animated sun. Rainy? Animated falling rain. Night? Stars and moon. It makes the app feel alive and contextual."},
+  {q:"Is SkyCast free to use?",a:"Yes! You only need a free OpenWeatherMap API key (openweathermap.org — free tier supports 1,000 calls/day). Paste your key into the config at the top of the HTML file and you're live."},
+  {q:"Does SkyCast work on mobile?",a:"Absolutely. SkyCast is fully mobile-first with a hamburger navigation, scrollable hourly cards, and responsive grid layouts that adapt cleanly to any screen size."},
+];
+function buildFAQ(){
+  const list=document.getElementById('faqList');
+  FAQS.forEach(f=>{
+    const item=document.createElement('div');
+    item.className='faq-item';
+    item.innerHTML=`<div class="faq-q"><span>${f.q}</span><div class="faq-arr">▾</div></div><div class="faq-a"><p>${f.a}</p></div>`;
+    item.querySelector('.faq-q').addEventListener('click',()=>{
+      const open=item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(el=>el.classList.remove('open'));
+      if(!open)item.classList.add('open');
+    });
+    list.appendChild(item);
+  });
+}
+
+/* ===================================================
+   HAMBURGER
+   =================================================== */
+function closeMobile(){document.getElementById('mobileMenu').classList.remove('open')}
+document.getElementById('hamburger').addEventListener('click',()=>{
+  document.getElementById('mobileMenu').classList.toggle('open');
+});
+
+/* ===================================================
+   SCROLL REVEAL
+   =================================================== */
+const ro=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')});
+},{threshold:0.08});
+document.querySelectorAll('.reveal').forEach(el=>ro.observe(el));
+
+/* ===================================================
+   INIT
+   =================================================== */
+buildFAQ();
+loadCities();
+</script>
+</body>
+</html>
